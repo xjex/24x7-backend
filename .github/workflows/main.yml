@@ -93,6 +93,11 @@ jobs:
               labels:
                 app: dental-backend
             spec:
+              tolerations:
+              - key: "eks.amazonaws.com/compute-type"
+                operator: "Equal"
+                value: "fargate"
+                effect: "NoSchedule"
               containers:
               - image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ github.sha }}
                 imagePullPolicy: Always
@@ -136,6 +141,20 @@ jobs:
         
     - name: Update kubeconfig
       run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+      
+    - name: Create Fargate profile if not exists
+      run: |
+        PROFILE_EXISTS=$(aws eks list-fargate-profiles --cluster-name ${{ env.EKS_CLUSTER_NAME }} --query "fargateProfileNames[?contains(@, 'dental-app')]" --output text)
+        if [ -z "$PROFILE_EXISTS" ]; then
+          echo "Creating Fargate profile for dental-app namespace"
+          aws eks create-fargate-profile \
+            --fargate-profile-name dental-app-profile \
+            --cluster-name ${{ env.EKS_CLUSTER_NAME }} \
+            --pod-execution-role-arn $(aws iam get-role --role-name "AmazonEKSFargatePodExecutionRole" --query "Role.Arn" --output text) \
+            --selectors namespace=dental-app,labels={app=dental-backend}
+        else
+          echo "Fargate profile already exists"
+        fi
       
     - name: Deploy to EKS
       run: |

@@ -10,7 +10,7 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY_BACKEND: dental-office/backend
   EKS_CLUSTER_NAME: xavier-dental-cluster
-  COMMIT_SHORT_SHA: ${{ github.sha::7 }}
+
 
 jobs:
   build-and-deploy:
@@ -34,7 +34,7 @@ jobs:
     - name: Set ECR Registry URL and image tag
       run: |
         echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_ENV
-        echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+        echo "IMAGE_TAG=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
       
     - name: Create ECR repository if it doesn't exist
       run: |

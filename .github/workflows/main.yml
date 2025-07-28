@@ -124,6 +124,12 @@ jobs:
                   limits:
                     memory: "512Mi"
                     cpu: "500m"
+              # Fargate requires setting these security contexts
+              securityContext:
+                fsGroup: 65534
+                runAsUser: 10000
+                runAsGroup: 10000
+                runAsNonRoot: true
         ---
         apiVersion: v1
         kind: Service
@@ -165,3 +171,16 @@ jobs:
       run: |
         # Wait for the deployment to be ready with a timeout
         kubectl rollout status deployment/backend-deployment -n dental-app --timeout=90s
+        
+        # Get pod status
+        echo "Pod status:"
+        kubectl get pods -n dental-app
+        
+        # Get pod logs if available
+        echo "Pod logs:"
+        POD_NAME=$(kubectl get pods -n dental-app -l app=dental-backend -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [ -n "$POD_NAME" ]; then
+          kubectl logs -n dental-app $POD_NAME --tail=50
+        else
+          echo "No pods found yet"
+        fi

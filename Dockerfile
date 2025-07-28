@@ -1,17 +1,12 @@
-FROM node:18-alpine
+FROM node:18-alpine AS builder
 
 WORKDIR /app
 
 # Copy package files first for better caching
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies)
-RUN apk add --no-cache --virtual .build-deps \
-    python3 \
-    make \
-    g++ \
-    && npm install \
-    && apk del .build-deps
+# Install all dependencies
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -19,8 +14,19 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
-# Prune dev dependencies
-RUN npm prune --production
+# Production stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm install --only=production
+
+# Copy built files from builder stage
+COPY --from=builder /app/dist ./dist
 
 # Expose port
 EXPOSE 5000

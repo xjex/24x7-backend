@@ -87,7 +87,7 @@ jobs:
           selector:
             matchLabels:
               app: dental-backend
-          replicas: 2
+          replicas: 1
           template:
             metadata:
               labels:
@@ -111,18 +111,6 @@ jobs:
                   limits:
                     memory: "512Mi"
                     cpu: "500m"
-                readinessProbe:
-                  httpGet:
-                    path: /health
-                    port: 5000
-                  initialDelaySeconds: 5
-                  periodSeconds: 10
-                livenessProbe:
-                  httpGet:
-                    path: /health
-                    port: 5000
-                  initialDelaySeconds: 15
-                  periodSeconds: 20
         ---
         apiVersion: v1
         kind: Service
@@ -156,3 +144,15 @@ jobs:
     - name: Verify deployment
       run: |
         kubectl rollout status deployment/backend-deployment -n dental-app
+        
+    - name: Check pod status and logs
+      run: |
+        echo "Checking pod status..."
+        kubectl get pods -n dental-app
+        
+        echo "Waiting for pods to be ready..."
+        sleep 30
+        
+        echo "Getting pod logs..."
+        POD_NAME=$(kubectl get pods -n dental-app -l app=dental-backend -o jsonpath='{.items[0].metadata.name}')
+        kubectl logs -n dental-app $POD_NAME

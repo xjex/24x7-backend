@@ -74,9 +74,9 @@ jobs:
           namespace: dental-app
           name: backend-secrets
         type: Opaque
-        data:
-          MONGODB_URI: ${{ secrets.MONGODB_URI_BASE64 }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET_BASE64 }}
+        stringData:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         ---
         apiVersion: apps/v1
         kind: Deployment

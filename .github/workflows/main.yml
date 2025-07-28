@@ -33,6 +33,9 @@ jobs:
     - name: Set ECR Registry URL
       run: echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_ENV
       
+    - name: Set Image Tag
+      run: echo "IMAGE_TAG=${{ github.run_id }}" >> $GITHUB_ENV
+      
     - name: Create ECR repository if it doesn't exist
       run: |
         aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY_BACKEND }} || aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY_BACKEND }}
@@ -42,7 +45,7 @@ jobs:
       with:
         context: .
         push: true
-        tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:latest,${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ github.sha }}
+        tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ env.IMAGE_TAG }}
 
     - name: Update Kubernetes manifest with new image tags
       run: |
@@ -87,7 +90,7 @@ jobs:
           selector:
             matchLabels:
               app: dental-backend
-          replicas: 2
+          replicas: 1
           strategy:
             type: RollingUpdate
             rollingUpdate:
@@ -97,9 +100,10 @@ jobs:
             metadata:
               labels:
                 app: dental-backend
+                run-id: "${{ env.IMAGE_TAG }}"
             spec:
               containers:
-              - image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ github.sha }}
+              - image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ env.IMAGE_TAG }}
                 imagePullPolicy: Always
                 name: backend
                 ports:
@@ -156,8 +160,13 @@ jobs:
       
     - name: Deploy to EKS
       run: |
+        # Delete the old deployment if it exists
+        kubectl delete deployment backend-deployment -n dental-app --ignore-not-found=true
+        
+        # Apply the new deployment
         kubectl apply -f k8s/backend-app.yaml
         
     - name: Verify deployment
       run: |
-        kubectl rollout status deployment/backend-deployment -n dental-app
+        # Wait for the deployment to be ready
+        kubectl rollout status deployment/backend-deployment -n dental-app --timeout=120s

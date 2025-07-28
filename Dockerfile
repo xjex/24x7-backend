@@ -1,5 +1,4 @@
-# Multi-stage build for production optimization
-FROM node:18-alpine AS builder
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
@@ -7,9 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with more verbose output and fallback to npm install
-RUN npm ci --only=production || npm install --only=production
-RUN npm cache clean --force
+# Install dependencies including dev dependencies for build
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -17,26 +15,8 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine AS production
-
-# Set environment
-ENV NODE_ENV=production
-
-# Create app user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-# Set working directory
-WORKDIR /app
-
-# Copy built application from builder stage
-COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
-
-# Switch to non-root user
-USER nodejs
+# Remove dev dependencies
+RUN npm prune --production
 
 # Expose port
 EXPOSE 5000

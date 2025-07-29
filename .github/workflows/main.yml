@@ -144,6 +144,33 @@ jobs:
           type: ClusterIP
           selector:
             app: dental-backend
+        ---
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          namespace: dental-app
+          name: backend-ingress
+          annotations:
+            kubernetes.io/ingress.class: alb
+            alb.ingress.kubernetes.io/scheme: internet-facing
+            alb.ingress.kubernetes.io/target-type: ip
+            alb.ingress.kubernetes.io/healthcheck-path: /health
+            alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+            alb.ingress.kubernetes.io/cors-allow-headers: "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+            alb.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+            alb.ingress.kubernetes.io/cors-allow-origin: "*"
+        spec:
+          rules:
+          - http:
+              paths:
+              - path: /api
+                pathType: Prefix
+                backend:
+                  service:
+                    name: backend-service
+                    port:
+                      number: 80
         EOF
 
     - name: Install kubectl
@@ -183,4 +210,24 @@ jobs:
           kubectl logs -n dental-app $POD_NAME --tail=50
         else
           echo "No pods found yet"
+        fi
+        
+    - name: Get Ingress URL
+      run: |
+        echo "Waiting for ingress to get an address..."
+        for i in {1..30}; do
+          INGRESS_HOST=$(kubectl get ingress backend-ingress -n dental-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+          if [ -n "$INGRESS_HOST" ]; then
+            echo "✅ Backend API is available at: http://$INGRESS_HOST"
+            echo "BACKEND_URL=http://$INGRESS_HOST" >> $GITHUB_ENV
+            break
+          fi
+          echo "Waiting for ingress address... (attempt $i/30)"
+          sleep 10
+        done
+        
+        if [ -z "$INGRESS_HOST" ]; then
+          echo "⚠️ Ingress did not receive an address within the timeout period."
+          echo "Check the ingress status manually:"
+          kubectl get ingress -n dental-app
         fi

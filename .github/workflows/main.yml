@@ -228,23 +228,18 @@ jobs:
           echo "No pods found yet"
         fi
         
-    - name: Get Ingress URL
+    - name: Get Application Ingress URL
       run: |
-        echo "Waiting for ingress to get an address..."
-        for i in {1..30}; do
-          INGRESS_HOST=$(kubectl get ingress backend-ingress -n dental-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-          if [ -n "$INGRESS_HOST" ]; then
-            echo "✅ Backend API is available at: http://$INGRESS_HOST"
-            echo "BACKEND_URL=http://$INGRESS_HOST" >> $GITHUB_ENV
-            break
-          fi
-          echo "Waiting for ingress address... (attempt $i/30)"
-          sleep 10
-        done
-        
-        if [ -z "$INGRESS_HOST" ]; then
-          echo "⚠️ Ingress did not receive an address within the timeout period."
-          echo "Check the ingress status manually:"
+        echo "Getting the unified ingress URL..."
+        INGRESS_HOST=$(kubectl get ingress dental-app-ingress -n dental-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+        if [ -n "$INGRESS_HOST" ]; then
+          echo "✅ Application is available at: http://$INGRESS_HOST"
+          echo "✅ Frontend: http://$INGRESS_HOST"
+          echo "✅ Backend API: http://$INGRESS_HOST/api"
+          echo "✅ Health Check: http://$INGRESS_HOST/health"
+          echo "APPLICATION_URL=http://$INGRESS_HOST" >> $GITHUB_ENV
+        else
+          echo "⚠️ Ingress address not found. Check ingress status:"
           kubectl get ingress -n dental-app
         fi
 

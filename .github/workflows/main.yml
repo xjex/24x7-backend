@@ -149,9 +149,8 @@ jobs:
         kind: Ingress
         metadata:
           namespace: dental-app
-          name: backend-ingress
+          name: dental-app-ingress
           annotations:
-            kubernetes.io/ingress.class: alb
             alb.ingress.kubernetes.io/scheme: internet-facing
             alb.ingress.kubernetes.io/target-type: ip
             alb.ingress.kubernetes.io/healthcheck-path: /health
@@ -160,7 +159,10 @@ jobs:
             alb.ingress.kubernetes.io/cors-allow-headers: "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
             alb.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
             alb.ingress.kubernetes.io/cors-allow-origin: "*"
+            alb.ingress.kubernetes.io/subnets: auto-discover
+            alb.ingress.kubernetes.io/tags: Environment=production,Application=dental-office
         spec:
+          ingressClassName: alb
           rules:
           - http:
               paths:
@@ -169,6 +171,20 @@ jobs:
                 backend:
                   service:
                     name: backend-service
+                    port:
+                      number: 80
+              - path: /health
+                pathType: Exact
+                backend:
+                  service:
+                    name: backend-service
+                    port:
+                      number: 80
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name: frontend-service
                     port:
                       number: 80
         EOF
@@ -231,3 +247,4 @@ jobs:
           echo "Check the ingress status manually:"
           kubectl get ingress -n dental-app
         fi
+

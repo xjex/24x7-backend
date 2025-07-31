@@ -4,6 +4,8 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import crypto from 'crypto';
 import passport from 'passport';
 import User, { IUser } from '../models/User';
+import Patient from '../models/Patient';
+import Dentist from '../models/Dentist';
 import { config } from '../config/config';
 import { AuthRequest } from '../middleware/auth';
 
@@ -41,19 +43,16 @@ const sendTokenResponse = (user: IUser, statusCode: number, res: Response): void
       token,
       user: {
         id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        name: user.name,
         email: user.email,
-        phone: user.phone,
         role: user.role,
-        isEmailVerified: user.isEmailVerified
+        isActive: user.isActive
       }
     });
 };
 
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       res.status(400).json({
@@ -65,18 +64,16 @@ export const register = async (req: Request, res: Response, next: NextFunction):
     }
 
     const {
-      firstName,
-      lastName,
+      name,
       email,
       password,
       phone,
-      dateOfBirth,
-      address,
-      emergencyContact,
-      medicalHistory
+      birthdate,
+      gender,
+      address
     } = req.body;
 
-    
+    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       res.status(400).json({
@@ -86,8 +83,8 @@ export const register = async (req: Request, res: Response, next: NextFunction):
       return;
     }
 
-    
-    const existingPhone = await User.findOne({ phone });
+    // Check if phone already exists in Patient collection
+    const existingPhone = await Patient.findOne({ phone });
     if (existingPhone) {
       res.status(400).json({
         success: false,
@@ -96,22 +93,22 @@ export const register = async (req: Request, res: Response, next: NextFunction):
       return;
     }
 
-    
+    // Create user account (for authentication)
     const user = await User.create({
-      firstName,
-      lastName,
+      name,
       email,
       password,
+      role: 'patient',
+      isActive: true
+    });
+
+    // Create patient profile (for detailed info)
+    const patient = await Patient.create({
+      userId: user._id,
+      birthdate: new Date(birthdate),
+      gender,
       phone,
-      dateOfBirth: new Date(dateOfBirth),
-      address,
-      emergencyContact,
-      medicalHistory: medicalHistory || {
-        allergies: [],
-        medications: [],
-        conditions: [],
-        notes: ''
-      }
+      address
     });
 
     sendTokenResponse(user, 201, res);
@@ -150,16 +147,47 @@ export const logout = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const getMe = async (req: Request, res: Response): Promise<void> => {
-  const authReq = req as AuthRequest;
-  res.status(200).json({
-    success: true,
-    user: authReq.user
-  });
+  try {
+    const authReq = req as AuthRequest;
+    const user = authReq.user;
+    
+    if (!user) {
+      res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+      return;
+    }
+    
+    let profileData = null;
+
+    if (user.role === 'patient') {
+      profileData = await Patient.findOne({ userId: user._id });
+    } else if (user.role === 'dentist') {
+      profileData = await Dentist.findOne({ userId: user._id });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        profile: profileData
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch user profile'
+    });
+  }
 };
 
 export const updateProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       res.status(400).json({
@@ -180,35 +208,43 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
       return;
     }
 
-    const fieldsToUpdate: any = {};
-    const allowedFields = [
-      'firstName',
-      'lastName',
-      'phone',
-      'address',
-      'emergencyContact',
-      'medicalHistory'
-    ];
+    const { name, phone, birthdate, gender, address } = req.body;
 
-    
-    Object.keys(req.body).forEach(key => {
-      if (allowedFields.includes(key)) {
-        fieldsToUpdate[key] = req.body[key];
-      }
-    });
+    // Update User account info (name only for User table)
+    const userFieldsToUpdate: any = {};
+    if (name) userFieldsToUpdate.name = name;
 
-    const user = await User.findByIdAndUpdate(
-      authReq.user._id,
-      fieldsToUpdate,
-      {
-        new: true,
-        runValidators: true
+    if (Object.keys(userFieldsToUpdate).length > 0) {
+      await User.findByIdAndUpdate(
+        authReq.user._id,
+        userFieldsToUpdate,
+        { new: true, runValidators: true }
+      );
+    }
+
+    // Update Patient profile info (if user is a patient)
+    if (authReq.user.role === 'patient') {
+      const patientFieldsToUpdate: any = {};
+      if (phone) patientFieldsToUpdate.phone = phone;
+      if (birthdate) patientFieldsToUpdate.birthdate = new Date(birthdate);
+      if (gender) patientFieldsToUpdate.gender = gender;
+      if (address) patientFieldsToUpdate.address = address;
+
+      if (Object.keys(patientFieldsToUpdate).length > 0) {
+        await Patient.findOneAndUpdate(
+          { userId: authReq.user._id },
+          patientFieldsToUpdate,
+          { new: true, runValidators: true }
+        );
       }
-    );
+    }
+
+    // Get updated user info
+    const updatedUser = await User.findById(authReq.user._id);
 
     res.status(200).json({
       success: true,
-      user
+      user: updatedUser
     });
   } catch (error) {
     next(error);

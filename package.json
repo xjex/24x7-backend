@@ -10,7 +10,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix"
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "seed": "ts-node src/scripts/seedData.ts",
+    "seed:clear": "ts-node src/scripts/seedData.ts --clear"
   },
   "keywords": ["dental", "scheduling", "api", "express", "typescript"],
   "author": "Dental Office Team",

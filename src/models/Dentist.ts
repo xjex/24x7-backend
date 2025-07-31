@@ -1,10 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IDentist extends Document {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
+  userId: mongoose.Types.ObjectId;
   licenseNumber: string;
   specialization: string[];
   experience: number;
@@ -40,35 +37,15 @@ export interface IDentist extends Document {
 }
 
 const DentistSchema: Schema = new Schema({
-  firstName: {
-    type: String,
-    required: [true, 'First name is required'],
-    trim: true,
-    maxlength: [50, 'First name cannot exceed 50 characters']
-  },
-  lastName: {
-    type: String,
-    required: [true, 'Last name is required'],
-    trim: true,
-    maxlength: [50, 'Last name cannot exceed 50 characters']
-  },
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
-  },
-  phone: {
-    type: String,
-    required: [true, 'Phone number is required'],
-    match: [/^\+?[\d\s\-\(\)]+$/, 'Please enter a valid phone number']
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: [true, 'User ID is required'],
+    unique: true
   },
   licenseNumber: {
     type: String,
     required: [true, 'License number is required'],
-    unique: true,
     trim: true
   },
   specialization: [{
@@ -178,15 +155,11 @@ const DentistSchema: Schema = new Schema({
   timestamps: true
 });
 
-DentistSchema.index({ email: 1 });
-DentistSchema.index({ licenseNumber: 1 });
+DentistSchema.index({ userId: 1 }, { unique: true });
+DentistSchema.index({ licenseNumber: 1 }, { unique: true });
 DentistSchema.index({ specialization: 1 });
 DentistSchema.index({ isActive: 1 });
 DentistSchema.index({ rating: -1 });
-
-DentistSchema.virtual('fullName').get(function() {
-  return `${this.firstName} ${this.lastName}`;
-});
 
 DentistSchema.methods.getAvailableSlots = function(date: Date) {
   const dayAvailability = this.availability.find((avail: any) => 

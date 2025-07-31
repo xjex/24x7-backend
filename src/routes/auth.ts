@@ -16,14 +16,10 @@ import { protect } from '../middleware/auth';
 const router = express.Router();
 
 router.post('/register', [
-  body('firstName')
+  body('name')
     .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('First name must be between 2 and 50 characters'),
-  body('lastName')
-    .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Last name must be between 2 and 50 characters'),
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Name must be between 2 and 100 characters'),
   body('email')
     .isEmail()
     .normalizeEmail()
@@ -34,38 +30,18 @@ router.post('/register', [
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
   body('phone')
-    .matches(/^\+?[\d\s\-\(\)]+$/)
+    .matches(/^[\+]?[1-9][\d]{0,15}$/)
     .withMessage('Please provide a valid phone number'),
-  body('dateOfBirth')
+  body('birthdate')
     .isISO8601()
     .withMessage('Please provide a valid date of birth'),
-  body('address.street')
+  body('gender')
+    .isIn(['male', 'female', 'other'])
+    .withMessage('Gender must be male, female, or other'),
+  body('address')
     .trim()
     .notEmpty()
-    .withMessage('Street address is required'),
-  body('address.city')
-    .trim()
-    .notEmpty()
-    .withMessage('City is required'),
-  body('address.state')
-    .trim()
-    .notEmpty()
-    .withMessage('State is required'),
-  body('address.zipCode')
-    .trim()
-    .notEmpty()
-    .withMessage('ZIP code is required'),
-  body('emergencyContact.name')
-    .trim()
-    .notEmpty()
-    .withMessage('Emergency contact name is required'),
-  body('emergencyContact.phone')
-    .matches(/^\+?[\d\s\-\(\)]+$/)
-    .withMessage('Please provide a valid emergency contact phone number'),
-  body('emergencyContact.relationship')
-    .trim()
-    .notEmpty()
-    .withMessage('Emergency contact relationship is required')
+    .withMessage('Address is required')
 ], register);
 
 router.post('/login', [
@@ -83,40 +59,28 @@ router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
 
 router.put('/profile', protect, [
-  body('firstName')
+  body('name')
     .optional()
     .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('First name must be between 2 and 50 characters'),
-  body('lastName')
-    .optional()
-    .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Last name must be between 2 and 50 characters'),
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Name must be between 2 and 100 characters'),
   body('phone')
     .optional()
-    .matches(/^\+?[\d\s\-\(\)]+$/)
+    .matches(/^[\+]?[1-9][\d]{0,15}$/)
     .withMessage('Please provide a valid phone number'),
-  body('address.street')
+  body('birthdate')
+    .optional()
+    .isISO8601()
+    .withMessage('Please provide a valid date of birth'),
+  body('gender')
+    .optional()
+    .isIn(['male', 'female', 'other'])
+    .withMessage('Gender must be male, female, or other'),
+  body('address')
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('Street address cannot be empty'),
-  body('address.city')
-    .optional()
-    .trim()
-    .notEmpty()
-    .withMessage('City cannot be empty'),
-  body('address.state')
-    .optional()
-    .trim()
-    .notEmpty()
-    .withMessage('State cannot be empty'),
-  body('address.zipCode')
-    .optional()
-    .trim()
-    .notEmpty()
-    .withMessage('ZIP code cannot be empty')
+    .withMessage('Address cannot be empty')
 ], updateProfile);
 
 router.put('/change-password', protect, [

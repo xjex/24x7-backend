@@ -26,8 +26,8 @@ export const config = {
   smtpPass: process.env.SMTP_PASS || '',
   
   // Rate limiting
-  rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100'),
+  rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // total time window for rate limiting
+  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '1000'),
   
   // CORS configuration
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',

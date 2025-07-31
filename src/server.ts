@@ -10,7 +10,9 @@ import passport from './config/passport';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import dentistRoutes from './routes/dentists';
+import patientRoutes from './routes/patients';
 import appointmentRoutes from './routes/appointments';
+import adminRoutes from './routes/admin';
 
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
@@ -53,7 +55,9 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dentists', dentistRoutes);
+app.use('/api/patients', patientRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

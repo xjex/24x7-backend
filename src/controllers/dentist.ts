@@ -6,6 +6,7 @@ import Dentist from '../models/Dentist';
 import Appointment from '../models/Appointment';
 import DentistService from '../models/DentistService';
 import Service from '../models/Service';
+import emailService from '../services/emailService';
 
 import { AuthRequest } from '../middleware/auth';
 
@@ -374,6 +375,63 @@ export const updateAppointmentStatus = async (req: Request, res: Response, next:
       { new: true, runValidators: true }
     ).populate('patientId', '-password')
      .populate('serviceId', 'name category description');
+
+    // Send email notifications based on status change
+    if (updatedAppointment) {
+      try {
+        const patient = updatedAppointment.patientId as any;
+        const service = updatedAppointment.serviceId as any;
+        const dentist = await User.findById(dentistUserId);
+
+        if (patient && service && dentist) {
+          switch (status) {
+            case 'confirmed':
+              await emailService.sendAppointmentApprovedToPatient(
+                patient.email,
+                patient.name,
+                updatedAppointment,
+                dentist.name,
+                service.name
+              );
+              break;
+            
+            case 'completed':
+              await emailService.sendAppointmentCompletedThankYou(
+                patient.email,
+                patient.name,
+                updatedAppointment,
+                dentist.name,
+                service.name
+              );
+              break;
+            
+            case 'no-show':
+              await emailService.sendNoShowRescheduleRequest(
+                patient.email,
+                patient.name,
+                updatedAppointment,
+                dentist.name,
+                service.name
+              );
+              break;
+            
+            case 'cancelled':
+              await emailService.sendAppointmentCancellationConfirmation(
+                patient.email,
+                patient.name,
+                updatedAppointment,
+                dentist.name,
+                service.name,
+                'dentist'
+              );
+              break;
+          }
+        }
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+        // Don't fail the status update if email fails
+      }
+    }
 
     res.status(200).json({
       success: true,

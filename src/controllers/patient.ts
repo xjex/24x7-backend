@@ -5,6 +5,7 @@ import Dentist from '../models/Dentist';
 import Service from '../models/Service';
 import DentistService from '../models/DentistService';
 import Appointment from '../models/Appointment';
+import emailService from '../services/emailService';
 
 export const getPatientProfile = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -93,12 +94,7 @@ export const getPatientAppointments = async (req: Request, res: Response, next: 
       .populate({
         path: 'dentistId',
         model: 'User',
-        select: 'name email',
-        populate: {
-          path: '_id',
-          model: 'Dentist',
-          select: 'specialization licenseNumber'
-        }
+        select: 'name email'
       })
       .populate({
         path: 'serviceId',
@@ -107,9 +103,32 @@ export const getPatientAppointments = async (req: Request, res: Response, next: 
       })
       .sort({ date: -1, time: -1 });
 
+
+
+    const dentistIds = appointments.map(apt => (apt.dentistId as any)?._id).filter(Boolean);
+    const dentistProfiles = await Dentist.find({ userId: { $in: dentistIds } });
+
+    const appointmentsWithDentistData = appointments.map(appointment => {
+      const dentistUser = appointment.dentistId as any;
+      const dentistProfile = dentistProfiles.find(
+        profile => profile.userId.toString() === dentistUser?._id?.toString()
+      );
+      
+      return {
+        ...appointment.toObject(),
+        dentistId: dentistUser ? {
+          _id: dentistUser._id,
+          name: dentistUser.name || 'Unknown',
+          email: dentistUser.email || '',
+          specialization: dentistProfile?.specialization || [],
+          licenseNumber: dentistProfile?.licenseNumber || ''
+        } : null
+      };
+    });
+
     res.status(200).json({
       success: true,
-      appointments
+      appointments: appointmentsWithDentistData
     });
   } catch (error) {
     next(error);
@@ -142,6 +161,27 @@ export const cancelAppointment = async (req: Request, res: Response, next: NextF
 
     appointment.status = 'cancelled';
     await appointment.save();
+
+    // Send cancellation email to patient
+    try {
+      const patient = await User.findById(userId);
+      const dentist = await User.findById(appointment.dentistId);
+      const service = await Service.findById(appointment.serviceId);
+      
+      if (patient && dentist && service) {
+        await emailService.sendAppointmentCancellationConfirmation(
+          patient.email,
+          patient.name,
+          appointment,
+          dentist.name,
+          service.name,
+          'patient'
+        );
+      }
+    } catch (emailError) {
+      console.error('Failed to send cancellation email:', emailError);
+      // Don't fail the cancellation if email fails
+    }
 
     res.status(200).json({
       success: true,
@@ -246,6 +286,98 @@ export const getAvailableServices = async (req: Request, res: Response, next: Ne
   }
 };
 
+export const getDoctorAvailability = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { dentistId, startDate, endDate } = req.query;
+
+    if (!dentistId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Dentist ID is required'
+      });
+    }
+
+    const dentist = await Dentist.findOne({ userId: dentistId });
+    if (!dentist) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dentist not found'
+      });
+    }
+
+  
+    const start = startDate ? new Date(startDate as string) : new Date();
+    const end = endDate ? new Date(endDate as string) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    const availabilityData = [];
+    const currentDate = new Date(start);
+
+    while (currentDate <= end) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+
+      const workingDay = dentist.workingHours[dayName as keyof typeof dentist.workingHours];
+      
+      if (!workingDay?.isWorking) {
+        availabilityData.push({
+          date: dateStr,
+          status: 'unavailable',
+          reason: 'Not working',
+          timeSlots: []
+        });
+        currentDate.setDate(currentDate.getDate() + 1);
+        continue;
+      }
+
+      const existingAppointments = await Appointment.find({
+        dentistId,
+        date: dateStr,
+        status: { $in: ['pending', 'confirmed'] }
+      }).select('time duration');
+
+      const timeSlots = generateTimeSlots(workingDay.start, workingDay.end);
+      const bookedTimes = existingAppointments.map(apt => apt.time);
+ 
+      const formattedSlots = timeSlots.map(slot => {
+        const isBooked = bookedTimes.includes(slot);
+        return {
+          time24: slot,
+          time12: convertTo12Hour(slot),
+          isAvailable: !isBooked,
+          isBooked
+        };
+      });
+
+      const availableCount = formattedSlots.filter(slot => slot.isAvailable).length;
+      const totalSlots = formattedSlots.length;
+
+      let status = 'available';
+      if (availableCount === 0) {
+        status = 'fully-booked';
+      } else if (availableCount <= totalSlots * 0.3) {
+        status = 'limited';
+      }
+
+      availabilityData.push({
+        date: dateStr,
+        status,
+        availableSlots: availableCount,
+        totalSlots,
+        timeSlots: formattedSlots
+      });
+
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    res.status(200).json({
+      success: true,
+      availability: availabilityData
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getAvailableSlots = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { dentistId, date } = req.query;
@@ -257,23 +389,43 @@ export const getAvailableSlots = async (req: Request, res: Response, next: NextF
       });
     }
 
+    // Get dentist working hours for the specific date
+    const dentist = await Dentist.findOne({ userId: dentistId });
+    if (!dentist) {
+      return res.status(404).json({
+        success: false,
+        error: 'Dentist not found'
+      });
+    }
+
+    const requestDate = new Date(date as string);
+    const dayName = requestDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const workingDay = dentist.workingHours[dayName as keyof typeof dentist.workingHours];
+
+    if (!workingDay?.isWorking) {
+      return res.status(200).json({
+        success: true,
+        slots: [],
+        message: 'Dentist not available on this day'
+      });
+    }
+
     const existingAppointments = await Appointment.find({
       dentistId,
       date: date as string,
-      status: { $in: ['scheduled', 'confirmed'] }
+      status: { $in: ['pending', 'confirmed'] }
     }).select('time duration');
 
-    const workingHours = [
-      '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-      '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00'
-    ];
-
+   
+    const timeSlots = generateTimeSlots(workingDay.start, workingDay.end);
     const bookedTimes = existingAppointments.map(apt => apt.time);
-    const availableSlots = workingHours
+    
+    const availableSlots = timeSlots
       .filter(time => !bookedTimes.includes(time))
       .map(time => ({
         date: date as string,
-        time
+        time24: time,
+        time12: convertTo12Hour(time)
       }));
 
     res.status(200).json({
@@ -285,6 +437,36 @@ export const getAvailableSlots = async (req: Request, res: Response, next: NextF
   }
 };
 
+function generateTimeSlots(startTime: string, endTime: string): string[] {
+  const slots = [];
+  const start = convertTimeToMinutes(startTime);
+  const end = convertTimeToMinutes(endTime);
+  
+  for (let time = start; time < end; time += 30) {
+    slots.push(convertMinutesToTime(time));
+  }
+  
+  return slots;
+}
+
+function convertTimeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function convertMinutesToTime(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+}
+
+function convertTo12Hour(time24: string): string {
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
 export const bookAppointment = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req.user as any)?._id;
@@ -294,7 +476,7 @@ export const bookAppointment = async (req: Request, res: Response, next: NextFun
       dentistId,
       date,
       time,
-      status: { $in: ['scheduled', 'confirmed'] }
+      status: { $in: ['pending', 'confirmed'] }
     });
 
     if (existingAppointment) {
@@ -327,11 +509,31 @@ export const bookAppointment = async (req: Request, res: Response, next: NextFun
       date,
       time,
       duration,
-      status: 'scheduled',
+      status: 'pending',
       notes
     });
 
     await appointment.save();
+
+    // Get patient and dentist details for email
+    const patient = await User.findById(userId);
+    const dentist = await User.findById(dentistId);
+    
+    if (patient && dentist) {
+      try {
+        // Send notification to dentist about new appointment
+        await emailService.sendNewAppointmentNotificationToDentist(
+          dentist.email,
+          dentist.name,
+          appointment,
+          patient.name,
+          service.name
+        );
+      } catch (emailError) {
+        console.error('Failed to send email notification:', emailError);
+        // Don't fail the appointment creation if email fails
+      }
+    }
 
     res.status(201).json({
       success: true,

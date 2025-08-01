@@ -8,7 +8,10 @@ import {
   createAppointment,
   updateAppointment,
   updateAppointmentStatus,
-  getDentistServices
+  getDentistServices,
+  updateWorkingHours,
+  getWorkingHours,
+  updateDayAvailability
 } from '../controllers/dentist';
 import { protect, authorize } from '../middleware/auth';
 import User from '../models/User';
@@ -22,6 +25,25 @@ router.use(authorize('dentist'));
 
 // Profile routes
 router.get('/profile', getDentistProfile);
+
+// Working hours routes
+router.get('/working-hours', getWorkingHours);
+router.put('/working-hours', [
+  body('workingHours').isObject().withMessage('Working hours must be an object'),
+  body('workingHours.monday').isObject().withMessage('Monday hours required'),
+  body('workingHours.tuesday').isObject().withMessage('Tuesday hours required'),
+  body('workingHours.wednesday').isObject().withMessage('Wednesday hours required'),
+  body('workingHours.thursday').isObject().withMessage('Thursday hours required'),
+  body('workingHours.friday').isObject().withMessage('Friday hours required'),
+  body('workingHours.saturday').isObject().withMessage('Saturday hours required'),
+  body('workingHours.sunday').isObject().withMessage('Sunday hours required')
+], updateWorkingHours);
+
+// Day-specific availability
+router.put('/availability', [
+  body('date').isISO8601().withMessage('Valid date required'),
+  body('timeSlots').isArray().withMessage('Time slots must be an array')
+], updateDayAvailability);
 
 router.put('/profile', [
   body('licenseNumber')

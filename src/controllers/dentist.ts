@@ -35,6 +35,143 @@ export const getDentistProfile = async (req: Request, res: Response, next: NextF
   }
 };
 
+// Update working hours
+export const updateWorkingHours = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?._id;
+    const { workingHours } = req.body;
+
+    const dentist = await Dentist.findOne({ userId });
+    if (!dentist) {
+      res.status(404).json({
+        success: false,
+        message: 'Dentist profile not found'
+      });
+      return;
+    }
+
+    // Validate working hours format
+    const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    for (const day of daysOfWeek) {
+      if (!workingHours[day]) {
+        res.status(400).json({
+          success: false,
+          message: `Working hours for ${day} are required`
+        });
+        return;
+      }
+
+      const { start, end, isWorking } = workingHours[day];
+      
+      if (isWorking && (!start || !end)) {
+        res.status(400).json({
+          success: false,
+          message: `Start and end times are required for working days`
+        });
+        return;
+      }
+
+      // Validate time format (HH:MM)
+      const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (isWorking && (!timeRegex.test(start) || !timeRegex.test(end))) {
+        res.status(400).json({
+          success: false,
+          message: `Invalid time format for ${day}. Use HH:MM format`
+        });
+        return;
+      }
+
+      // Validate that end time is after start time
+      if (isWorking && start >= end) {
+        res.status(400).json({
+          success: false,
+          message: `End time must be after start time for ${day}`
+        });
+        return;
+      }
+    }
+
+    dentist.workingHours = workingHours;
+    await dentist.save();
+
+    res.status(200).json({
+      success: true,
+      data: dentist.workingHours,
+      message: 'Working hours updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get working hours
+export const getWorkingHours = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?._id;
+
+    const dentist = await Dentist.findOne({ userId });
+    if (!dentist) {
+      res.status(404).json({
+        success: false,
+        message: 'Dentist profile not found'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: dentist.workingHours
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update specific day availability
+export const updateDayAvailability = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authReq = req as AuthRequest;
+    const userId = authReq.user?._id;
+    const { date, timeSlots } = req.body;
+
+    const dentist = await Dentist.findOne({ userId });
+    if (!dentist) {
+      res.status(404).json({
+        success: false,
+        message: 'Dentist profile not found'
+      });
+      return;
+    }
+
+    // Find existing availability for the date
+    const existingAvailabilityIndex = dentist.availability.findIndex(
+      (avail: any) => avail.date.toISOString().split('T')[0] === date
+    );
+
+    if (existingAvailabilityIndex >= 0) {
+      // Update existing availability
+      dentist.availability[existingAvailabilityIndex].timeSlots = timeSlots;
+    } else {
+      // Add new availability
+      dentist.availability.push({
+        date: new Date(date),
+        timeSlots
+      });
+    }
+
+    await dentist.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Day availability updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Update dentist profile
 export const updateDentistProfile = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {

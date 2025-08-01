@@ -67,7 +67,7 @@ const seedDentists = async () => {
             year: 2012
           }
         ],
-        bio: 'Dr. Johnson is a dedicated dentist with over 12 years of experience in general and cosmetic dentistry.',
+        bio: 'Johnson is a dedicated dentist with over 12 years of experience in general and cosmetic dentistry.',
         consultationFee: 150,
         rating: 4.8,
         totalReviews: 234
@@ -84,7 +84,7 @@ const seedDentists = async () => {
             year: 2016
           }
         ],
-        bio: 'Dr. Chen specializes in orthodontics and pediatric dentistry, helping children and adults achieve perfect smiles.',
+        bio: 'Chen specializes in orthodontics and pediatric dentistry, helping children and adults achieve perfect smiles.',
         consultationFee: 175,
         rating: 4.9,
         totalReviews: 189
@@ -101,7 +101,7 @@ const seedDentists = async () => {
             year: 2009
           }
         ],
-        bio: 'Dr. Rodriguez is an experienced oral surgeon with expertise in complex extractions and dental implants.',
+        bio: 'Rodriguez is an experienced oral surgeon with expertise in complex extractions and dental implants.',
         consultationFee: 200,
         rating: 4.7,
         totalReviews: 156
@@ -118,7 +118,7 @@ const seedDentists = async () => {
             year: 2014
           }
         ],
-        bio: 'Dr. Thompson is an endodontic specialist focused on root canal therapy and saving natural teeth.',
+        bio: 'Thompson is an endodontic specialist focused on root canal therapy and saving natural teeth.',
         consultationFee: 180,
         rating: 4.6,
         totalReviews: 203
@@ -135,7 +135,7 @@ const seedDentists = async () => {
             year: 2010
           }
         ],
-        bio: 'Dr. Williams is a periodontal specialist dedicated to treating gum disease and maintaining optimal oral health.',
+        bio: 'Williams is a periodontal specialist dedicated to treating gum disease and maintaining optimal oral health.',
         consultationFee: 160,
         rating: 4.8,
         totalReviews: 178
@@ -165,35 +165,35 @@ const seedDentistUsers = async () => {
 
     const dentistUsersData = [
       {
-        name: 'Dr. Sarah Johnson',
+        name: 'Sarah Johnson',
         email: 'sarah.johnson@dentalcare.com',
         password: 'Dentist123!',
         role: 'dentist',
         isActive: true
       },
       {
-        name: 'Dr. Michael Chen',
+        name: 'Michael Chen',
         email: 'michael.chen@dentalcare.com',
         password: 'Dentist123!',
         role: 'dentist',
         isActive: true
       },
       {
-        name: 'Dr. Emily Rodriguez',
+        name: 'Emily Rodriguez',
         email: 'emily.rodriguez@dentalcare.com',
         password: 'Dentist123!',
         role: 'dentist',
         isActive: true
       },
       {
-        name: 'Dr. Robert Thompson',
+        name: 'Robert Thompson',
         email: 'robert.thompson@dentalcare.com',
         password: 'Dentist123!',
         role: 'dentist',
         isActive: true
       },
       {
-        name: 'Dr. Lisa Williams',
+        name: 'Lisa Williams',
         email: 'lisa.williams@dentalcare.com',
         password: 'Dentist123!',
         role: 'dentist',

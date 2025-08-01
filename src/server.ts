@@ -13,6 +13,7 @@ import dentistRoutes from './routes/dentists';
 import patientRoutes from './routes/patients';
 import appointmentRoutes from './routes/appointments';
 import adminRoutes from './routes/admin';
+import publicRoutes from './routes/public';
 
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
@@ -58,6 +59,7 @@ app.use('/api/dentists', dentistRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/public', publicRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

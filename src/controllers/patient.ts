@@ -217,10 +217,48 @@ export const rescheduleAppointment = async (req: Request, res: Response, next: N
       });
     }
 
+   
+    const oldDate = appointment.date;
+    const oldTime = appointment.time;
+
     appointment.date = date;
     appointment.time = time;
     appointment.status = 'pending';
     await appointment.save();
+
+
+    try {
+      const patient = await User.findById(userId);
+      const dentist = await User.findById(appointment.dentistId);
+      const service = await Service.findById(appointment.serviceId);
+      
+      if (patient && dentist && service) {
+        // Send notification to dentist
+        await emailService.sendAppointmentRescheduledNotificationToDentist(
+          dentist.email,
+          dentist.name,
+          appointment,
+          patient.name,
+          service.name,
+          oldDate,
+          oldTime
+        );
+
+       
+        await emailService.sendAppointmentRescheduledConfirmationToPatient(
+          patient.email,
+          patient.name,
+          appointment,
+          dentist.name,
+          service.name,
+          oldDate,
+          oldTime
+        );
+      }
+    } catch (emailError) {
+      console.error('Failed to send reschedule email notifications:', emailError);
+      
+    }
 
     res.status(200).json({
       success: true,
@@ -472,6 +510,26 @@ export const bookAppointment = async (req: Request, res: Response, next: NextFun
     const userId = (req.user as any)?._id;
     const { dentistId, serviceId, date, time, notes } = req.body;
 
+    console.log('Booking attempt:', { userId, dentistId, serviceId, date, time, notes });
+
+    // Check if this user already has a pending/confirmed appointment for the same slot
+    const userExistingAppointment = await Appointment.findOne({
+      patientId: userId,
+      dentistId,
+      date,
+      time,
+      status: { $in: ['pending', 'confirmed'] }
+    });
+
+    if (userExistingAppointment) {
+      console.log('User already has appointment at this slot:', userExistingAppointment._id);
+      return res.status(409).json({
+        success: false,
+        error: 'You already have an appointment at this time slot'
+      });
+    }
+
+    // Check if any other user has this time slot
     const existingAppointment = await Appointment.findOne({
       dentistId,
       date,
@@ -479,11 +537,28 @@ export const bookAppointment = async (req: Request, res: Response, next: NextFun
       status: { $in: ['pending', 'confirmed'] }
     });
 
+    console.log('Existing appointment check:', existingAppointment);
+
     if (existingAppointment) {
-      return res.status(409).json({
-        success: false,
-        error: 'This time slot is already booked'
+      console.log('Conflict detected with:', {
+        existingId: existingAppointment._id,
+        existingPatient: existingAppointment.patientId,
+        existingStatus: existingAppointment.status,
+        requestingUser: userId,
+        isSameUser: existingAppointment.patientId.toString() === userId.toString()
       });
+      
+      if (existingAppointment.patientId.toString() === userId.toString()) {
+        return res.status(409).json({
+          success: false,
+          error: 'You already have an appointment at this time slot'
+        });
+      } else {
+        return res.status(409).json({
+          success: false,
+          error: 'This time slot is already booked'
+        });
+      }
     }
 
     const service = await Service.findById(serviceId);
@@ -513,7 +588,9 @@ export const bookAppointment = async (req: Request, res: Response, next: NextFun
       notes
     });
 
+    console.log('Creating appointment:', appointment.toObject());
     await appointment.save();
+    console.log('Appointment created successfully:', appointment._id);
 
     // Get patient and dentist details for email
     const patient = await User.findById(userId);

@@ -259,6 +259,135 @@ class EmailService {
     });
   }
 
+  async sendAppointmentRescheduledNotificationToDentist(
+    dentistEmail: string,
+    dentistName: string,
+    appointment: any,
+    patientName: string,
+    serviceName: string,
+    oldDate: string,
+    oldTime: string
+  ) {
+    const subject = 'Appointment Rescheduled - DentalCare+';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #f59e0b;">Appointment Rescheduled</h2>
+        
+        <p>Dear Dr. ${dentistName},</p>
+        
+        <p><strong>${patientName}</strong> has rescheduled their appointment with you.</p>
+        
+        <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+          <h3 style="color: #374151; margin-top: 0;">Previous Appointment</h3>
+          <ul style="list-style: none; padding: 0;">
+            <li><strong>Date:</strong> ${this.formatDate(oldDate)}</li>
+            <li><strong>Time:</strong> ${this.formatTime(oldTime)}</li>
+            <li><strong>Service:</strong> ${serviceName}</li>
+          </ul>
+        </div>
+        
+        <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #059669;">
+          <h3 style="color: #374151; margin-top: 0;">New Appointment Details</h3>
+          <ul style="list-style: none; padding: 0;">
+            <li><strong>Patient:</strong> ${patientName}</li>
+            <li><strong>Service:</strong> ${serviceName}</li>
+            <li><strong>Date:</strong> ${this.formatDate(appointment.date)}</li>
+            <li><strong>Time:</strong> ${this.formatTime(appointment.time)}</li>
+            <li><strong>Duration:</strong> ${appointment.duration} minutes</li>
+            ${appointment.notes ? `<li><strong>Notes:</strong> ${appointment.notes}</li>` : ''}
+          </ul>
+        </div>
+        
+        <p>The appointment status has been set to <strong>pending</strong> and requires your approval.</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/dentist/appointments" 
+             style="background-color: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+            Review Rescheduled Appointment
+          </a>
+        </div>
+        
+        <p style="color: #6b7280; font-size: 14px;">
+          Best regards,<br>
+          DentalCare+ Team
+        </p>
+      </div>
+    `;
+
+    await this.transporter.sendMail({
+      from: process.env.SMTP_FROM || 'noreply@dentalcare.com',
+      to: dentistEmail,
+      subject,
+      html
+    });
+  }
+
+  async sendAppointmentRescheduledConfirmationToPatient(
+    patientEmail: string,
+    patientName: string,
+    appointment: any,
+    dentistName: string,
+    serviceName: string,
+    oldDate: string,
+    oldTime: string
+  ) {
+    const subject = 'Appointment Reschedule Request Received - DentalCare+';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #2563eb;">Reschedule Request Received</h2>
+        
+        <p>Dear ${patientName},</p>
+        
+        <p>We have received your request to reschedule your appointment with Dr. ${dentistName}.</p>
+        
+        <div style="background-color: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+          <h3 style="color: #374151; margin-top: 0;">Previous Appointment</h3>
+          <ul style="list-style: none; padding: 0;">
+            <li><strong>Date:</strong> ${this.formatDate(oldDate)}</li>
+            <li><strong>Time:</strong> ${this.formatTime(oldTime)}</li>
+          </ul>
+        </div>
+        
+        <div style="background-color: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
+          <h3 style="color: #374151; margin-top: 0;">New Requested Appointment</h3>
+          <ul style="list-style: none; padding: 0;">
+            <li><strong>Dentist:</strong> Dr. ${dentistName}</li>
+            <li><strong>Service:</strong> ${serviceName}</li>
+            <li><strong>Date:</strong> ${this.formatDate(appointment.date)}</li>
+            <li><strong>Time:</strong> ${this.formatTime(appointment.time)}</li>
+            <li><strong>Duration:</strong> ${appointment.duration} minutes</li>
+          </ul>
+        </div>
+        
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 6px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400e;">
+            <strong>Status:</strong> Your reschedule request is pending approval from Dr. ${dentistName}. You will receive a confirmation email once approved.
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/dashboard/appointments" 
+             style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+            View My Appointments
+          </a>
+        </div>
+        
+        <p style="color: #6b7280; font-size: 14px;">
+          If you need to make any changes, please contact us or reschedule again.<br><br>
+          Best regards,<br>
+          DentalCare+ Team
+        </p>
+      </div>
+    `;
+
+    await this.transporter.sendMail({
+      from: process.env.SMTP_FROM || 'noreply@dentalcare.com',
+      to: patientEmail,
+      subject,
+      html
+    });
+  }
+
   async sendAppointmentCancellationConfirmation(
     patientEmail: string,
     patientName: string,
